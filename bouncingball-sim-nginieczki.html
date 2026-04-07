@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Bouncing Ball Energy Simulation</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    background: #f4f6f8;
+  }
+  h1 { margin-top: 20px; }
+
+  canvas {
+    background: white;
+    border: 2px solid black;
+  }
+
+  .controls {
+    margin-top: 10px;
+  }
+
+  .energy {
+    margin-top: 10px;
+    font-size: 16px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Bouncing Ball Energy Simulation</h1>
+
+<canvas id="simCanvas" width="600" height="400"></canvas>
+
+<div class="controls">
+  <button onclick="dropBall()">Drop Ball</button>
+  <label>Drop Height (m): </label>
+  <input type="range" id="heightSlider" min="10" max="200" value="150">
+  <span id="heightValue">150</span>
+</div>
+
+<div class="energy">
+  Thermal Energy Generated: <span id="thermalEnergy">0</span> J
+</div>
+
+<script>
+const canvas = document.getElementById("simCanvas");
+const ctx = canvas.getContext("2d");
+
+const g = 9.8;
+const mass = 1;
+const restitution = 0.85;
+
+let ball = {
+  x: 50,   // meters (center)
+  y: 200,  // start at top
+  vy: 0,
+  radius: 10,
+  active: false
+};
+
+let thermalEnergy = 0;
+
+const scaleY = canvas.height / 200;
+const scaleX = canvas.width / 100;
+
+function drawAxes() {
+  ctx.fillStyle = "#000";
+
+  // Y axis labels
+  for (let i = 0; i <= 200; i += 50) {
+    let y = canvas.height - i * scaleY;
+    ctx.fillText(i + " m", 5, y);
+  }
+
+  // X axis labels
+  for (let i = 0; i <= 100; i += 20) {
+    let x = i * scaleX;
+    ctx.fillText(i + " m", x, canvas.height - 5);
+  }
+}
+
+function drawBall() {
+  ctx.beginPath();
+  ctx.arc(ball.x * scaleX, canvas.height - ball.y * scaleY, ball.radius, 0, Math.PI * 2);
+  ctx.fillStyle = "red";
+  ctx.fill();
+}
+
+function update() {
+  if (!ball.active) return;
+
+  // Apply gravity
+  ball.vy -= g * 0.05;
+  ball.y += ball.vy * 0.05;
+
+  // Ground collision
+  if (ball.y <= 0) {
+    ball.y = 0;
+
+    let keBefore = 0.5 * mass * ball.vy * ball.vy;
+
+    // Bounce
+    ball.vy = -ball.vy * restitution;
+
+    let keAfter = 0.5 * mass * ball.vy * ball.vy;
+
+    let lostEnergy = keBefore - keAfter;
+    thermalEnergy += lostEnergy;
+
+    document.getElementById("thermalEnergy").innerText =
+      thermalEnergy.toFixed(2);
+  }
+
+  // Stop when motion is negligible
+  if (Math.abs(ball.vy) < 0.2 && ball.y === 0) {
+    ball.active = false;
+  }
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawAxes();
+  drawBall();
+}
+
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+function dropBall() {
+  let height = parseFloat(document.getElementById("heightSlider").value);
+
+  ball.x = 50;
+  ball.y = height;   // starts from chosen height
+  ball.vy = 0;
+  ball.active = true;
+
+  thermalEnergy = 0;
+  document.getElementById("thermalEnergy").innerText = "0";
+}
+
+document.getElementById("heightSlider").oninput = function() {
+  document.getElementById("heightValue").innerText = this.value;
+};
+
+loop();
+</script>
+
+</body>
+</html>
