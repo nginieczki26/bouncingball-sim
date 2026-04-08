@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conservation of Energy: 2D Bouncing Ball</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f8;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            max-width: 800px;
+        }
+        .simulation-area {
+            display: flex;
+            gap: 30px;
+            margin-bottom: 20px;
+            justify-content: center;
+        }
+        canvas {
+            background-color: #e8f4f8;
+            border: 2px solid #bdc3c7;
+            border-radius: 5px;
+        }
+        .controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 20px;
+            padding-top: 15px;
+            border-top: 2px solid #ecf0f1;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            background-color: #3498db;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+            width: 160px; /* Fixed width so it doesn't jump when text changes */
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button:active {
+            transform: scale(0.95);
+        }
+        button.stop-btn {
+            background-color: #e74c3c;
+        }
+        button.stop-btn:hover {
+            background-color: #c0392b;
+        }
+        .slider-container {
+            display: flex;
+            flex-direction: column;
+            font-size: 14px;
+        }
+        .slider-container label {
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .slider-container input:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .energy-tracker {
+            display: flex;
+            gap: 20px;
+            height: 250px;
+            align-items: flex-end;
+            padding: 15px;
+            background: #fdfdfd;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .bar-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 50px;
+        }
+        .bar-value {
+            font-size: 11px;
+            font-family: monospace;
+            color: #555;
+            margin-bottom: 5px;
+            height: 15px;
+        }
+        .bar-label {
+            font-size: 12px;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+        .bar-wrapper {
+            height: 170px;
+            width: 35px;
+            background-color: #ecf0f1;
+            border: 1px solid #ccc;
+            position: relative;
+        }
+        .bar {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 0%;
+            transition: height 0.05s linear;
+        }
+        #pe-bar { background-color: #3498db; }
+        #ke-bar { background-color: #2ecc71; }
+        #te-bar { background-color: #e74c3c; }
+    </style>
+</head>
+<body>
+
+    <h1>Conservation of Energy: 2D Bouncing Ball</h1>
+    
+    <div class="container">
+        <div class="simulation-area">
+            <canvas id="simCanvas" width="300" height="600"></canvas>
+            
+            <div class="energy-tracker">
+                <div class="bar-container">
+                    <div id="pe-val" class="bar-value">0 J</div>
+                    <div class="bar-wrapper"><div id="pe-bar" class="bar"></div></div>
+                    <div class="bar-label">PE</div>
+                </div>
+                <div class="bar-container">
+                    <div id="ke-val" class="bar-value">0 J</div>
+                    <div class="bar-wrapper"><div id="ke-bar" class="bar"></div></div>
+                    <div class="bar-label">KE</div>
+                </div>
+                <div class="bar-container">
+                    <div id="te-val" class="bar-value">0 J</div>
+                    <div class="bar-wrapper"><div id="te-bar" class="bar"></div></div>
+                    <div class="bar-label">Thermal</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="dropBtn">Drop Ball</button>
+            <div class="slider-container">
+                <label for="heightSlider">Height: <span id="heightDisplay">200</span> m</label>
+                <input type="range" id="heightSlider" min="10" max="200" value="200" step="1">
+            </div>
+            <div class="slider-container">
+                <label for="gravitySlider">Gravity: <span id="gravityDisplay">1.0</span> g</label>
+                <input type="range" id="gravitySlider" min="0.1" max="5.0" value="1.0" step="0.1">
+            </div>
+            <div class="slider-container">
+                <label for="elasticitySlider">Elasticity: <span id="elasticityDisplay">0.75</span></label>
+                <input type="range" id="elasticitySlider" min="0.1" max="1.0" value="0.75" step="0.05">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        const dropBtn = document.getElementById('dropBtn');
+        
+        const heightSlider = document.getElementById('heightSlider');
+        const heightDisplay = document.getElementById('heightDisplay');
+        const gravitySlider = document.getElementById('gravitySlider');
+        const gravityDisplay = document.getElementById('gravityDisplay');
+        const elasticitySlider = document.getElementById('elasticitySlider');
+        const elasticityDisplay = document.getElementById('elasticityDisplay');
+        
+        const peBar = document.getElementById('pe-bar');
+        const keBar = document.getElementById('ke-bar');
+        const teBar = document.getElementById('te-bar');
+        const peVal = document.getElementById('pe-val');
+        const keVal = document.getElementById('ke-val');
+        const teVal = document.getElementById('te-val');
+
+        // Coordinate scaling
+        const PIXELS_PER_METER = 3; 
+        const BASE_GRAVITY = 9.8; 
+        const MASS = 1; 
+        const BALL_RADIUS_M = 4; 
+        const MAX_X_M = 100; 
+        const MAX_Y_M = 200; 
+        const TIME_SCALE = 3.5; 
+
+        let currentGravity = BASE_GRAVITY; 
+        let currentRestitution = 0.75; 
+        
+        let isRunning = false;
+        let animationId;
+        let lastTime = 0;
+        
+        let ball = {
+            x: 50, 
+            y: 200, 
+            vx: 0,
+            vy: 0,
+            scaleX: 1.0,
+            scaleY: 1.0,
+            svx: 0, 
+            svy: 0  
+        };
+
+        let maxEnergy = 0;
+
+        function drawGrid() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = '#d9e3e8'; 
+            ctx.fillStyle = '#95a5a6';
+            ctx.font = '10px Arial';
+            ctx.lineWidth = 1;
+
+            for (let i = 0; i <= MAX_Y_M; i += 50) {
+                let py = canvas.height - (i * PIXELS_PER_METER);
+                ctx.beginPath();
+                ctx.moveTo(0, py);
+                ctx.lineTo(canvas.width, py);
+                ctx.stroke();
+                if(i > 0) ctx.fillText(i + 'm', 5, py - 5);
+            }
+
+            for (let i = 0; i <= MAX_X_M; i += 25) {
+                let px = (i * PIXELS_PER_METER);
+                ctx.beginPath();
+                ctx.moveTo(px, 0);
+                ctx.lineTo(px, canvas.height);
+                ctx.stroke();
+                if (i > 0 && i < MAX_X_M) ctx.fillText(i + 'm', px + 5, canvas.height - 5);
+            }
+        }
+
+        function drawBall() {
+            let px = ball.x * PIXELS_PER_METER;
+            let py = canvas.height - (ball.y * PIXELS_PER_METER);
+            let pr = BALL_RADIUS_M * PIXELS_PER_METER;
+
+            ctx.save();
+            ctx.translate(px, py);
+            ctx.scale(ball.scaleX, ball.scaleY);
+
+            ctx.beginPath();
+            ctx.arc(0, 0, pr, 0, Math.PI * 2);
+            ctx.fillStyle = '#e67e22'; 
+            ctx.fill();
+            
+            ctx.lineWidth = 2 / Math.max(ball.scaleX, ball.scaleY);
+            ctx.strokeStyle = '#d35400';
+            ctx.stroke();
+            
+            ctx.restore();
+        }
+
+        function updateEnergyBars() {
+            let PE = MASS * currentGravity * ball.y;
+            let KE = 0.5 * MASS * (Math.pow(ball.vx, 2) + Math.pow(ball.vy, 2));
+            let currentMechEnergy = PE + KE;
+            let TE = maxEnergy - currentMechEnergy;
+            
+            if (TE < 0) TE = 0; 
+
+            let pePercent = maxEnergy > 0 ? (PE / maxEnergy) * 100 : 0;
+            let kePercent = maxEnergy > 0 ? (KE / maxEnergy) * 100 : 0;
+            let tePercent = maxEnergy > 0 ? (TE / maxEnergy) * 100 : 0;
+
+            peBar.style.height = `${Math.max(0, Math.min(100, pePercent))}%`;
+            keBar.style.height = `${Math.max(0, Math.min(100, kePercent))}%`;
+            teBar.style.height = `${Math.max(0, Math.min(100, tePercent))}%`;
+            
+            peVal.innerText = `${Math.round(PE)} J`;
+            keVal.innerText = `${Math.round(KE)} J`;
+            teVal.innerText = `${Math.round(TE)} J`;
+        }
+
+        function setControlsDisabled(disabled) {
+            heightSlider.disabled = disabled;
+            gravitySlider.disabled = disabled;
+            elasticitySlider.disabled = disabled;
+        }
+
+        function resetButtonState() {
+            dropBtn.innerText = "Drop Ball";
+            dropBtn.classList.remove('stop-btn');
+            setControlsDisabled(false);
+        }
+
+        function triggerSquash(axis, velocity) {
+            let impactForce = Math.min(0.6, Math.abs(velocity) * 0.02);
+            if (axis === 'y') {
+                ball.scaleY = 1.0 - impactForce;
+                ball.scaleX = 1.0 + impactForce; 
+            } else if (axis === 'x') {
+                ball.scaleX = 1.0 - impactForce;
+                ball.scaleY = 1.0 + impactForce;
+            }
+        }
+
+        function updatePhysics(dt) {
+            ball.vy -= currentGravity * dt;
+            
+            ball.x += ball.vx * dt;
+            ball.y += ball.vy * dt;
+
+            // Left Wall
+            if (ball.x <= BALL_RADIUS_M) {
+                triggerSquash('x', ball.vx);
+                ball.x = BALL_RADIUS_M;
+                ball.vx = -ball.vx * currentRestitution;
+            }
+            
+            // Right Wall
+            if (ball.x >= MAX_X_M - BALL_RADIUS_M) {
+                triggerSquash('x', ball.vx);
+                ball.x = MAX_X_M - BALL_RADIUS_M;
+                ball.vx = -ball.vx * currentRestitution;
+            }
+
+            // Floor
+            if (ball.y <= BALL_RADIUS_M) {
+                triggerSquash('y', ball.vy);
+                
+                ball.y = BALL_RADIUS_M; 
+                ball.vy = -ball.vy * currentRestitution; 
+                ball.vx *= 0.90;
+
+                // Stop conditions
+                if (Math.abs(ball.vy) < 1.5 && Math.abs(ball.vx) < 1.5) {
+                    ball.vy = 0;
+                    ball.vx = 0;
+                    ball.y = BALL_RADIUS_M;
+                    isRunning = false; 
+                    resetButtonState(); // Reset the button automatically
+                }
+            }
+        }
+
+        function updateJiggle() {
+            const springStrength = 0.2;
+            const dampening = 0.85;
+
+            ball.svx += (1.0 - ball.scaleX) * springStrength;
+            ball.svy += (1.0 - ball.scaleY) * springStrength;
+            
+            ball.svx *= dampening;
+            ball.svy *= dampening;
+            
+            ball.scaleX += ball.svx;
+            ball.scaleY += ball.svy;
+        }
+
+        function loop(timestamp) {
+            if (!lastTime) lastTime = timestamp;
+            let dt = ((timestamp - lastTime) / 1000) * TIME_SCALE; 
+            lastTime = timestamp;
+
+            if (dt > 0.1 * TIME_SCALE) dt = 0.1 * TIME_SCALE;
+
+            if (isRunning) {
+                const steps = 5;
+                const stepDt = dt / steps;
+                for(let i=0; i<steps; i++) {
+                    updatePhysics(stepDt);
+                }
+            }
+
+            updateJiggle();
+            drawGrid();
+            drawBall();
+            updateEnergyBars();
+
+            let isJiggling = Math.abs(1.0 - ball.scaleX) > 0.01 || Math.abs(ball.svx) > 0.01;
+
+            if (isRunning || isJiggling) {
+                animationId = requestAnimationFrame(loop);
+            }
+        }
+
+        function generateRandomXVelocity() {
+            return (Math.random() * 20) - 10;
+        }
+
+        function setupDrop() {
+            ball.y = parseFloat(heightSlider.value);
+            ball.x = 50; 
+            ball.vy = 0;
+            ball.vx = generateRandomXVelocity();
+            
+            ball.scaleX = 1.0;
+            ball.scaleY = 1.0;
+            ball.svx = 0;
+            ball.svy = 0;
+            
+            currentGravity = parseFloat(gravitySlider.value) * BASE_GRAVITY;
+            currentRestitution = parseFloat(elasticitySlider.value);
+            
+            maxEnergy = (MASS * currentGravity * ball.y) + (0.5 * MASS * Math.pow(ball.vx, 2));
+        }
+
+        function updateVisualsWithoutStarting() {
+            if (!isRunning) {
+                setupDrop();
+                drawGrid();
+                drawBall();
+                updateEnergyBars();
+            }
+        }
+
+        heightSlider.addEventListener('input', (e) => {
+            heightDisplay.innerText = parseFloat(e.target.value);
+            updateVisualsWithoutStarting();
+        });
+
+        gravitySlider.addEventListener('input', (e) => {
+            let g = parseFloat(e.target.value);
+            gravityDisplay.innerText = g.toFixed(1);
+            updateVisualsWithoutStarting();
+        });
+
+        elasticitySlider.addEventListener('input', (e) => {
+            let el = parseFloat(e.target.value);
+            elasticityDisplay.innerText = el.toFixed(2);
+            currentRestitution = el;
+        });
+
+        dropBtn.addEventListener('click', () => {
+            if (isRunning) {
+                // STOP LOGIC
+                isRunning = false;
+                if (animationId) {
+                    cancelAnimationFrame(animationId);
+                }
+                resetButtonState();
+                
+                // Keep rendering once more just in case jiggle physics are active
+                animationId = requestAnimationFrame(loop);
+            } else {
+                // START LOGIC
+                isRunning = true;
+                setControlsDisabled(true); 
+                
+                // Update button appearance
+                dropBtn.innerText = "Stop Simulation";
+                dropBtn.classList.add('stop-btn');
+                
+                setupDrop(); 
+                lastTime = performance.now();
+                animationId = requestAnimationFrame(loop);
+            }
+        });
+
+        // Initialize setup on page load
+        setupDrop();
+        drawGrid();
+        drawBall();
+        updateEnergyBars();
+    </script>
+</body>
+</html>
